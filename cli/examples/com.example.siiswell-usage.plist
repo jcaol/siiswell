@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS LaunchAgent: collect and upload token usage every 15 minutes.
+  1. Replace /ABSOLUTE/PATH/TO/node and /ABSOLUTE/PATH/TO/siiswell.mjs (`which node`; launchd has no shell PATH).
+  2. Put url / hostToken / host in ~/.config/siiswell/config.json (chmod 600): launchd does not read your shell profile,
+     and a token written into this plist would be readable by other users.
+  3. cp com.example.siiswell-usage.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.example.siiswell-usage.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.example.siiswell-usage</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/ABSOLUTE/PATH/TO/node</string>
+    <string>/ABSOLUTE/PATH/TO/siiswell.mjs</string>
+    <string>usage</string>
+    <string>push</string>
+  </array>
+  <key>StartInterval</key><integer>900</integer>
+  <key>RunAtLoad</key><true/>
+  <key>LowPriorityIO</key><true/>
+  <key>Nice</key><integer>10</integer>
+  <key>StandardOutPath</key><string>/tmp/siiswell-usage.log</string>
+  <key>StandardErrorPath</key><string>/tmp/siiswell-usage.log</string>
+</dict>
+</plist>

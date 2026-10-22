@@ -1,0 +1,388 @@
+openapi: 3.1.0
+info:
+  title: siiswell client API
+  version: "1"
+  summary: MCP task reporting, the usage collector, and the host integration API (wire contract v1).
+  description: |
+    Client-facing endpoints only; the browser API (/api/state, /api/usage, /api/push/*) is not covered. The main
+    surface is /mcp (agents report long-running tasks) and /api/ingest/usage (daily token totals). The endpoints
+    tagged "Host integration (advanced)" let any script or tool report hosts, projects, agents and tasks.
+    Everything here is wire contract **v1** (`v: 1` in bodies, `src/shared/schema.ts`): fields are only ever added,
+    never renamed. See docs/api.md for the prose version, limits and curl examples.
+
+    Authentication is a bearer token `oct_` + 43 base64url characters. A token has a **kind**:
+      - `host`   -> /api/ingest/* (usage, and the host integration API). The token's NAME is the host label: every
+                    body's `host` must equal it (403 otherwise).
+      - `client` -> /mcp (report_task / update_task / heartbeat / list_tasks / operator_status) and /api/ingest/human. Shown on the dashboard as `<agent>@<client name>`.
+    A token of the wrong kind gets 403, an unknown / revoked / malformed one 401. Never follow a redirect with the
+    token attached (the official clients refuse any 3xx).
+tags:
+  - name: MCP task reporting
+  - name: Usage
+  - name: Host integration (advanced)
+servers:
+  - url: https://dash.example.com
+security:
+  - bearer: []
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: "oct_ + 43 base64url characters"
+  headers:
+    RetryAfter:
+      description: Seconds until a retry can succeed (429, 503).
+      schema: { type: integer }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, description: "Human-readable reason; never echoes request data." }
+    Label:
+      type: string
+      pattern: "^[A-Za-z0-9._-]{1,64}$"
+    Heartbeat:
+      type: object
+      required: [v, host]
+      properties:
+        v: { const: 1 }
+        host: { $ref: "#/components/schemas/Label" }
+        project: { $ref: "#/components/schemas/Label" }
+        at: { type: integer, description: "epoch ms (informational)" }
+        binaryVersion: { type: string, maxLength: 40 }
+    HeartbeatOk:
+      type: object
+      required: [ok]
+      properties:
+        ok: { const: true }
+        budgetExhausted: { type: boolean, description: "the host's write budget is spent: snapshots / events are refused until budgetUntil" }
+        budgetUntil: { type: integer }
+    Snapshot:
+      type: object
+      description: |
+        The current state of one project of a host (ProjectSnapshot in src/shared/schema.ts). At most 256 KiB serialized,
+        200 tasks; text fields are scrubbed and clipped (titles 120, other text 300 characters) again by the server.
+        Further optional fields defined in schema.ts are accepted; an integration does not need them.
+      required: [v, host, project, sentAt, poller, agents, tasks]
+      properties:
+        v: { const: 1 }
+        host: { $ref: "#/components/schemas/Label" }
+        project: { $ref: "#/components/schemas/Label" }
+        sentAt: { type: integer }
+        textMode: { enum: [full, titles, none] }
+        poller:
+          type: object
+          description: The reporting process itself (status and version).
+          required: [status, binaryVersion]
+          properties:
+            status: { type: string }
+            binaryVersion: { type: string }
+            lastPoll: { type: integer }
+            startedAt: { type: integer }
+            exeStale: { type: boolean }
+        agents:
+          type: array
+          items:
+            type: object
+            required: [name, state]
+            properties:
+              name: { type: string }
+              baseCli: { type: string }
+              state: { enum: [working, idle, frozen, killed, wedged, benched, usage-limit, compacting, unknown] }
+              stateSince: { type: integer }
+              contextTokens: { type: integer }
+              contextPercent: { type: number, minimum: 0, maximum: 100 }
+              usage:
+                type: array
+                items:
+                  type: object
+                  required: [label, usedPercent]
+                  properties:
+                    label: { type: string }
+                    usedPercent: { type: number }
+                    resetsAt: { type: integer }
+              currentTaskId: { type: string }
+              lastReplyAt: { type: integer }
+        tasks:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required: [id, agent, title, state, dispatchedAt, updatedAt]
+            properties:
+              id: { type: string }
+              agent: { type: string }
+              title: { type: string, maxLength: 120 }
+              state: { enum: [queued, delivered, acked, running, blocked, done, failed, skipped] }
+              dispatchedAt: { type: integer, description: "epoch ms the task started" }
+              updatedAt: { type: integer }
+              etaAt: { type: integer }
+              lastLine: { type: string, maxLength: 300 }
+
+    UsageRow:
+      type: object
+      description: Numbers and labels only. A string outside its character set rejects the WHOLE request (400), never rewritten.
+      required: [day, project, agent, source, model, input, output, cacheRead, cacheWrite5m, cacheWrite1h, requests, usd]
+      properties:
+        day: { type: string, format: date }
+        project: { type: string, pattern: "^[A-Za-z0-9._()@-]{1,64}$", description: "(other) = folded" }
+        agent: { type: string, pattern: "^(?:[A-Za-z0-9._-]{1,64}|\\(other\\))$" }
+        source: { type: string, pattern: "^[A-Za-z0-9._()@-]{1,64}$", description: "claude | codex | (mixed)" }
+        model: { type: string, maxLength: 200, description: "a price-table id; anything else is stored as unknown" }
+        input: { type: number, minimum: 0, maximum: 1.0e11 }
+        output: { type: number, minimum: 0, maximum: 1.0e11 }
+        cacheRead: { type: number, minimum: 0, maximum: 1.0e11 }
+        cacheWrite5m: { type: number, minimum: 0, maximum: 1.0e11 }
+        cacheWrite1h: { type: number, minimum: 0, maximum: 1.0e11 }
+        requests: { type: number, minimum: 0, maximum: 1.0e7 }
+        usd: { type: [number, "null"], minimum: 0, maximum: 1.0e7, description: "API-equivalent USD; null = unpriced model" }
+    UsageUpload:
+      type: object
+      required: [v, host, rows]
+      properties:
+        v: { const: 1 }
+        host: { $ref: "#/components/schemas/Label" }
+        tz: { type: string, pattern: "^[A-Za-z0-9_/+-]{1,40}$", description: "IANA zone of the rows' days and hours; default the dashboard's DASHBOARD_TZ (UTC unless configured)" }
+        generatedAt: { type: integer, description: "epoch ms of the data (clamped to now)" }
+        mode: { enum: [recent, full], description: "full + complete=true on the LAST batch of a whole-history upload marks the history as complete" }
+        complete: { type: boolean }
+        completeDays:
+          type: array
+          maxItems: 35
+          items: { type: string, format: date }
+          description: |
+            AUTHORITATIVE days: the request carries ALL of this host's rows of these days, so the host's other rows of those days
+            are deleted. May only name days that have rows in this request; never split a day across requests.
+        rows: { type: array, maxItems: 2000, items: { $ref: "#/components/schemas/UsageRow" } }
+        hourly:
+          type: array
+          maxItems: 4000
+          items: { $ref: "#/components/schemas/HourlyUsageRow" }
+          description: |
+            OPTIONAL and additive (a server without hourly storage ignores it, an older client never sends it). The same rows keyed by
+            the host's LOCAL hour; only hours of days this request carries rows for. When present, the `completeDays` are authoritative
+            for their hours too. Kept 90 days (the daily rows stay); at most 1200 hourly rows per host and day; each row is charged to
+            the usage allowance like a daily row.
+    HourlyUsageRow:
+      allOf:
+        - { $ref: "#/components/schemas/UsageRow" }
+        - type: object
+          required: [hour]
+          properties:
+            hour: { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}T([01]\\d|2[0-3])$", description: "local hour YYYY-MM-DDTHH (replaces day)" }
+    UsageErase:
+      type: object
+      required: [v, host, mode]
+      properties:
+        v: { const: 1 }
+        host: { $ref: "#/components/schemas/Label" }
+        mode: { const: erase }
+    JsonRpcRequest:
+      type: object
+      required: [jsonrpc, method]
+      properties:
+        jsonrpc: { const: "2.0" }
+        id: { type: [string, integer] }
+        method: { type: string, description: "initialize, ping, server/discover (modern), tools/list, tools/call, notifications/*" }
+        params: { type: object }
+paths:
+  /api/health:
+    get:
+      summary: Liveness and server version (no data, no authentication)
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { const: true }
+                  version: { type: string }
+  /api/ingest/heartbeat:
+    post:
+      summary: Host is alive (host token). Always accepted, even over the write budget.
+      tags: [Host integration (advanced)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Heartbeat" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/HeartbeatOk" } } } }
+        "400": { description: Invalid body, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "401": { description: Missing / unknown / revoked token }
+        "403": { description: "A client token, or `host` is not this token's name" }
+        "413": { description: Body too large }
+        "429": { description: Request rate over 60/min for this token, headers: { Retry-After: { $ref: "#/components/headers/RetryAfter" } } }
+  /api/ingest/snapshot:
+    post:
+      summary: Current state of one project of a host (host token)
+      tags: [Host integration (advanced)]
+      description: |
+        Send on change at most every 2 min (urgent changes every 15 s), otherwise heartbeats; re-send an unchanged snapshot once
+        per 24 h. An accepted snapshot counts as a heartbeat. At most 30 projects per host.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Snapshot" }
+      responses:
+        "200":
+          description: Stored (or unchanged)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { const: true }
+                  tasks: { type: integer }
+                  unchanged: { type: boolean }
+                  dropped: { type: integer }
+                  firstError: { type: string }
+                  alertsOpened: { type: integer }
+                  alertsResolved: { type: integer }
+        "400": { description: Invalid body }
+        "401": { description: Bad token }
+        "403": { description: Wrong token kind or host label }
+        "413": { description: Body or stored snapshot too large }
+        "429": { description: "Rate limit, project limit or the host's 24 h write budget; see Retry-After", headers: { Retry-After: { $ref: "#/components/headers/RetryAfter" } } }
+  /api/ingest/events:
+    post:
+      summary: Timestamped events of one project, e.g. status lines and incidents (host token; at most 100 per batch)
+      tags: [Host integration (advanced)]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [v, host, project, events]
+              properties:
+                v: { const: 1 }
+                host: { $ref: "#/components/schemas/Label" }
+                project: { $ref: "#/components/schemas/Label" }
+                events: { type: array, maxItems: 100, items: { type: object, description: "DashboardEvent in src/shared/schema.ts" } }
+      responses:
+        "200": { description: "Accepted (see accepted / dropped / budgetExhausted)" }
+        "400": { description: Invalid body }
+        "401": { description: Bad token }
+        "403": { description: Wrong token kind or host label }
+        "429": { description: Rate limit or write budget }
+  /api/ingest/human:
+    post:
+      summary: The operator's own input as hourly counts (client token), sent by the siiswell hooks
+      tags: [Usage]
+      description: |
+        Body `{v:1, hours:[{h, prompts, approvals, rapid, latN, latP50}]}`: `h` a whole UTC hour start (epoch ms) of the
+        last 7 days, at most 48 hours, whole counts 0..100000, `latP50` the median response time in ms (or null). Numbers
+        only; other fields are ignored and never stored. Each hour replaces the source's earlier upload of it. At most one
+        accepted upload per source every 4 minutes. 503 before migration 0011.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [v, hours] }
+      responses:
+        "200": { description: "Stored (ok, hours)" }
+        "400": { description: Invalid body }
+        "403": { description: Not a client token }
+        "429": { description: "Rate limit, or less than 4 minutes since the last upload (Retry-After)" }
+        "503": { description: Migration 0011 not applied }
+  /api/ingest/otlp:
+    post:
+      summary: Optional OTLP/HTTP JSON metrics from Claude Code (host token); off unless the server sets OTLP_INGEST=1
+      tags: [Usage]
+      description: |
+        Only the DELTA sums `claude_code.token.usage` (attribute `type` = input / output / cacheRead / cacheCreation, `model`)
+        and `claude_code.cost.usage` (USD) are read; they are added to the host's hourly usage under project `(other)`. Body at
+        most 256 KiB, at most 2000 data points. 404 while switched off. See docs/otel.md.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: "OTLP ExportMetricsServiceRequest (JSON encoding)" }
+      responses:
+        "200": { description: "Stored (ExportMetricsServiceResponse, plus ok / rows / skipped)" }
+        "404": { description: "OTLP ingest is switched off on this server" }
+        "415": { description: "Not JSON (protobuf OTLP is not accepted)" }
+  /api/ingest/usage:
+    post:
+      summary: Daily token usage rows of a host (host token), or erase them (`mode = erase`)
+      tags: [Usage]
+      description: |
+        Body at most 1 MiB. Days outside [retention .. tomorrow] are dropped (counted). Per host: at most 300 rows per day
+        (more are refused and counted as `capped`; the official clients fold the smallest keys of a day into one `(other)` row
+        first) and an allowance of 60 000 units per 24 h window (a row = 1, a day touched = 30; history requests may use 80 %).
+        An unchanged re-send writes nothing. `needFull: true` = the server does not hold this host's whole history yet.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/UsageUpload"
+                - $ref: "#/components/schemas/UsageErase"
+      responses:
+        "200":
+          description: Stored, or erased
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      ok: { const: true }
+                      rows: { type: integer }
+                      dropped: { type: integer }
+                      capped: { type: integer }
+                      needFull: { type: boolean }
+                  - type: object
+                    properties:
+                      ok: { const: true }
+                      erased: { type: integer }
+                      remaining: { enum: [0, 1], description: "1 = send another erase request" }
+        "400": { description: "Invalid body (the message names the field, e.g. rows[3].project)" }
+        "401": { description: Bad token }
+        "403": { description: Wrong token kind or host label }
+        "413": { description: Body over 1 MiB }
+        "429": { description: Allowance or write budget spent, headers: { Retry-After: { $ref: "#/components/headers/RetryAfter" } } }
+        "503": { description: Usage tables missing (migration not applied) }
+  /mcp:
+    post:
+      summary: MCP over Streamable HTTP, stateless, JSON responses (client token)
+      tags: [MCP task reporting]
+      description: |
+        Protocol versions 2026-07-28 (modern, `_meta` in params + Mcp-Method / Mcp-Name headers) and 2025-11-25, 2025-06-18,
+        2025-03-26, 2024-11-05 (legacy; batches of at most 10 messages in 2025-03-26). Tools: report_task {project, title,
+        kind, status, eta_min?, summary?, agent?} -> {"task_id","state"} (kind: coding, debugging, testing, review, research,
+        docs, deploy, ops or other); update_task {task_id, status, kind?, eta_min?, summary?};
+        heartbeat {project?} -> "ok". list_tasks {} -> {now, tasks:[...]} (this client's open and recently stale tasks).
+        operator_status {} -> whether the operator is available or away. report_task also takes an optional `machine` label (the siiswell stdio server fills it in
+        from its config) that groups the tasks of several apps on one machine, and an optional `client_ref` (16-64 of A-Z a-z 0-9 _ -): a retry with the same ref returns the task already created (`"repeated": true`) instead of a second one. Tool errors are `isError: true` results with a readable text. Limits per client token:
+        60 requests/min (each batch message counts), 50 open tasks, 1000 mutating calls per 24 h, body 64 KiB.
+        A request with an `Origin` header must come from an allowed origin (403 otherwise). GET / DELETE -> 405.
+      parameters:
+        - { name: MCP-Protocol-Version, in: header, required: false, schema: { type: string } }
+        - { name: Accept, in: header, required: false, schema: { type: string, example: "application/json, text/event-stream" } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/JsonRpcRequest"
+                - { type: array, maxItems: 10, items: { $ref: "#/components/schemas/JsonRpcRequest" } }
+      responses:
+        "200": { description: JSON-RPC response (or array) }
+        "202": { description: Notification accepted (no body) }
+        "400": { description: "Parse error, invalid request, or unsupported MCP-Protocol-Version (`supported` list in error.data)" }
+        "401": { description: Bad token }
+        "403": { description: "A host token, or an Origin that is not allowed" }
+        "404": { description: Unknown method (modern protocol only) }
+        "405": { description: Not POST }
+        "413": { description: Body over 64 KiB }
+        "429": { description: Rate limit, headers: { Retry-After: { $ref: "#/components/headers/RetryAfter" } } }

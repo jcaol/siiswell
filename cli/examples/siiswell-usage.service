@@ -1,0 +1,14 @@
+# systemd user service: one collect + upload run. Install with siiswell-usage.timer:
+#   mkdir -p ~/.config/systemd/user && cp siiswell-usage.service siiswell-usage.timer ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now siiswell-usage.timer
+# Settings (url, hostToken, host) come from ~/.config/siiswell/config.json (chmod 600), not from this file.
+[Unit]
+Description=siiswell: collect and upload token usage
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env node %h/.local/lib/siiswell/siiswell.mjs usage push
+Nice=10
+IOSchedulingClass=idle
+# exit code 75 = rate limited by the dashboard; the next run continues
+SuccessExitStatus=75

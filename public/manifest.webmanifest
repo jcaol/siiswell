@@ -1,0 +1,14 @@
+{
+  "id": "/",
+  "name": "siiswell",
+  "short_name": "siiswell",
+  "description": "A calm dashboard for your AI agents: what they are working on, what it costs, and how you are doing.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0e1013",
+  "theme_color": "#0e1013",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

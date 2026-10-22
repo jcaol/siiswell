@@ -1,0 +1,13 @@
+# gitleaks configuration: the default rules, plus the test files that deliberately contain fake secrets.
+# Those tests check that siiswell's redaction removes secret-shaped text; none of their values is a real credential.
+title = "siiswell"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "redaction tests and fixtures with fake, secret-shaped values"
+paths = [
+  '''^test/shared-redact(-formats)?\.test\.ts$''',
+  '''^test/(identifiers|ingest|push)\.test\.ts$''',
+]

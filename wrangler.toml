@@ -1,0 +1,121 @@
+# siiswell: what your AI coding agents are working on and what they cost (Cloudflare Worker + D1 + static assets).
+# Deploy checklist: docs/deploy.md.
+#
+# Nothing in this file talks to Cloudflare until somebody runs `wrangler deploy`
+# or a `--remote` command. `wrangler dev --local` needs no account.
+
+name = "siiswell"
+main = "src/index.ts"
+# Pinned on purpose (must stay >= 2 weeks old and <= the workerd bundled with the pinned wrangler).
+compatibility_date = "2026-09-01"
+
+# Do not expose the Worker on *.workers.dev or preview URLs: the only public entry
+# is the custom domain below, which sits behind Cloudflare Access.
+workers_dev = false
+preview_urls = false
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+# The Worker runs BEFORE static assets for these paths (everything else is served
+# straight from ./public). Array form of run_worker_first, verified against
+# https://developers.cloudflare.com/workers/static-assets/binding/
+run_worker_first = ["/api/*", "/mcp", "/mcp/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "siiswell"
+# Placeholder. After `wrangler d1 create siiswell` (this creates it in your Cloudflare account)
+# paste the real id here. `wrangler dev --local` ignores it.
+database_id = "REPLACE_AFTER_d1_create"
+migrations_dir = "migrations"
+
+[triggers]
+# Time-based alert rules, due pushes and retention purge. (This trigger has never been seen to fire for this Worker,
+# so the Durable Object ticker below is the clock that is relied on; both run the same body and stamp meta last_cron.)
+crons = ["* * * * *"]
+
+# The ticker: ONE global Durable Object (idFromName("main"), SQLite-backed, no routes reach it) whose alarm fires every
+# 60 s and runs the same work as the cron (time-based rules, push summaries, the purge claim), then re-arms itself.
+# It is started by the first ingest / /api/state / scheduled call after a deploy. TICKER_ENABLED = "0" switches it off.
+[[durable_objects.bindings]]
+name = "TICKER"
+class_name = "OrchTicker"
+
+# NEVER edit or remove this migration once deployed. A Durable Object class change blocks `wrangler rollback` to any
+# version before it: after this deploy, the way back is FORWARD only (fix and deploy again). Emergency stop of the
+# ticker: set TICKER_ENABLED = "0" in [vars] below and deploy (a var changed in the Cloudflare dashboard is overwritten
+# by the next deploy). Removing the class later needs a NEW migration with deleted_classes = ["OrchTicker"].
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OrchTicker"]
+
+# Per-token request budgets: Workers Rate Limiting bindings (wrangler >= 4.36), keyed by SOURCE ID in
+# the Worker, so one buggy pusher or leaked token cannot spend the shared D1 / CPU budget. 429 on
+# excess. A JSON-RPC batch of N messages is N requests. 60/min leaves room for a host with ~20 projects (each
+# sends about 2-3 requests a minute: snapshot / events + heartbeat); the D1 write budgets behind it
+# (docs/reference.md "Abuse limits") bound what a leaked token can write per day. `period` may only be 10 or 60
+# seconds; `namespace_id` is a positive integer (as a string) that must be unique in the Cloudflare
+# account (change it if "7311001" / "7311002" are taken). The counters are per Cloudflare location and
+# eventually consistent: this is a guard rail, not accounting.
+# https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
+[[ratelimits]]
+name = "RATE_LIMIT_HOST"
+namespace_id = "7311001"
+[ratelimits.simple]
+limit = 60
+period = 60
+
+[[ratelimits]]
+name = "RATE_LIMIT_CLIENT"
+namespace_id = "7311002"
+[ratelimits.simple]
+limit = 60
+period = 60
+
+[vars]
+# MUST equal the origin the dashboard is opened on (scheme + host, no path): /api/state and /api/push/* answer
+# 403 to a browser request whose Origin differs (the cross-site guard), and MCP checks it too.
+# This is a PLACEHOLDER: set the real origin per environment, either
+#   - in a [env.production] section (copy [vars] there, wrangler does not inherit vars into an env) and deploy with
+#     `wrangler deploy --env production`:
+#       [env.production.vars]
+#       PUBLIC_URL = "https://dash.your-domain.example"
+#   - or on the command line: `wrangler deploy --var PUBLIC_URL:https://dash.your-domain.example`
+# (The self-hosted Docker server reads PUBLIC_URL from its environment and refuses to start on this placeholder.)
+PUBLIC_URL = "https://dash.example.com"
+# Cloudflare Zero Trust team domain, e.g. "myteam.cloudflareaccess.com". Empty = API refuses
+# every Access-protected call unless DEV_NO_ACCESS=1 AND the request host is localhost.
+ACCESS_TEAM_DOMAIN = ""
+# Application Audience (AUD) tag of the Access application for dash.example.com.
+ACCESS_AUD = ""
+# SET THIS at deploy: comma-separated e-mail addresses allowed to open /api/state and the push routes
+# (compared case-insensitively with the `email` claim of the Access JWT). Defence in depth on top of the
+# Access policy: if the policy is ever widened by mistake, only these identities still get in. Empty = any
+# identity the Access policy lets through. A service-token JWT has no e-mail and is refused when this is set.
+ACCESS_ALLOWED_EMAILS = ""
+# Retention in whole days: the purge deletes events, tasks, resolved alerts, snapshots (unless the project still reports),
+# hosts and project_seen rows older than this. It runs from the ticker (every 60 s, purge claimed at most every 15 min),
+# the cron if it ever fires, and opportunistically from ingest / /api/state; bounded rows per run. Unset = 30.
+# Lower it to keep less data on Cloudflare.
+RETENTION_DAYS = "30"
+# Optional (defaults to 60000): the minimum time in ms between two INGEST-triggered rule evaluations of one source; the
+# ticker (or the cron) evaluates every minute anyway. 0 evaluates after every changed ingest (the test suite and local smoke runs).
+# RULES_MIN_INTERVAL_MS = "60000"
+# The dashboard's IANA time zone (default UTC): the usage page's days, the zone of a usage upload / OTLP data that names
+# none, and the well-being layer's zone until it is set on the page. An installation whose usage was bucketed in another
+# zone (older CLIs defaulted to Europe/London) should set that zone here.
+# DASHBOARD_TZ = "UTC"
+
+# Secrets (NOT in this file; set with `wrangler secret put <NAME>` at deploy):
+#   VAPID_PUBLIC_KEY   base64url, 65-byte uncompressed P-256 point   (bun scripts/vapid.ts)
+#   VAPID_PRIVATE_KEY  base64url, 32-byte private scalar             (bun scripts/vapid.ts)
+#   VAPID_SUBJECT      "mailto:you@example.com" or an https URL
+# Dev-only .dev.vars (gitignored) may set DEV_NO_ACCESS=1 and the VAPID values.
+
+# ENABLE AT DEPLOY (after the Access application for this hostname exists and has the
+# Bypass policy for /api/ingest/* and /mcp*). Left commented so a stray deploy cannot
+# publish the Worker on the public hostname by accident.
+# [[routes]]
+# pattern = "dash.example.com"
+# custom_domain = true

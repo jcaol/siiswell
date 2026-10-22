@@ -1,0 +1,11 @@
+siiswell
+Copyright 2026 siiswell.com
+https://siiswell.com · hello@siiswell.com · licensing: license@siiswell.com
+
+The server and web page are licensed under the GNU Affero General Public License, version 3 only
+(AGPL-3.0-only): see LICENSE. A commercial licence for them is available: see COMMERCIAL-LICENSE.md.
+
+The client (cli/, bridge/ and src/shared/, the code bundled into the siiswell CLI) is licensed under
+the Apache License, Version 2.0: see LICENSE-APACHE.
+
+Contributions are accepted under a Contributor License Agreement: see CLA.md and CONTRIBUTING.md.

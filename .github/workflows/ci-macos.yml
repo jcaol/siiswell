@@ -1,0 +1,38 @@
+name: CI (macOS, optional)
+
+# Optional: macOS runners are often busy, so this never runs on push or pull requests and is never a required check.
+# Run it by hand (Actions -> "CI (macOS, optional)" -> Run workflow), and once a week. A queued or failed run here does
+# not block anything; the Linux CI in ci.yml is the one that gates changes.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-macos
+  cancel-in-progress: true
+
+jobs:
+  test-macos:
+    runs-on: macos-15
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      # actions pinned to commit SHAs (a moved tag cannot change what runs); bump together with ci.yml
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2.1.3
+        with:
+          bun-version: 1.3.6
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun test
+        env:
+          NODE_ENV: test

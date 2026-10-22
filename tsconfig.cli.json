@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun"],
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["cli/**/*.ts"],
+  "exclude": ["node_modules", "cli/dist"]
+}

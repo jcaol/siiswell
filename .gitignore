@@ -1,0 +1,17 @@
+node_modules
+.wrangler
+.dev.vars
+.dev.vars.*
+*.env
+dist
+*.log
+.bun
+*.sqlite
+*.sqlite-*
+.DS_Store
+
+# private planning notes (never committed)
+/REVENUE-MODELS.md
+
+# the siiswell.com website lives outside this repository
+/site/

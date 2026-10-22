@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>siiswell</title>
+  <meta name="description" content="A calm dashboard for your AI agents: what they are working on, what it costs, and how you are doing.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1013" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="siiswell">
+  <!-- Access cookies are only sent to the manifest when asked for explicitly. -->
+  <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <!-- Classic script, synchronous: sets <html data-theme> (the saved Auto / Light / Dark choice) before first paint. -->
+  <script src="/theme.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="top-row">
+      <div class="brand">
+        <h1>siiswell <span class="brand-kind">dashboard</span></h1>
+        <p class="tagline">SI is well, I am well, all is well.</p>
+      </div>
+      <div class="tools">
+        <button id="btn-theme" class="tool" type="button" hidden><span id="theme-glyph" class="glyph" aria-hidden="true"></span><span id="theme-label"></span></button>
+        <a id="link-signout" class="tool" href="/cdn-cgi/access/logout">Sign out</a>
+      </div>
+    </div>
+    <div class="meta">
+      <span id="health" class="pill idle" hidden></span>
+      <span class="updated">
+        <span id="refreshed" class="muted" title="Hosts report about every 2 minutes (at once when something changes). This page re-checks every minute while it is open.">loading…</span>
+        <button id="btn-refresh" class="tool icon" type="button" aria-label="Refresh now" title="Refresh now"><span class="glyph" aria-hidden="true">&#8635;</span></button>
+      </span>
+    </div>
+    <div id="notify-row" class="top-actions" hidden>
+      <button id="btn-notify" type="button" hidden>Enable notifications</button>
+      <span id="push-status" class="muted" role="status"></span>
+    </div>
+    <p id="notify-help" class="help" hidden></p>
+    <p id="stale" class="banner" role="alert" hidden></p>
+    <p id="rules-warning" class="banner warn" role="status" hidden></p>
+    <p id="state-truncated" class="banner warn" role="status" hidden></p>
+  </header>
+
+  <nav id="summary" class="summary" aria-label="Summary"></nav>
+
+  <main>
+    <section id="sec-highlights" aria-labelledby="h-highlights" hidden>
+      <h2 id="h-highlights">Highlights <span class="muted small">this week at a glance · ☆ pins a card to the front</span></h2>
+      <div id="highlights" class="hl-grid"></div>
+    </section>
+
+    <section id="sec-you" aria-labelledby="h-you">
+      <h2 id="h-you" class="cat-h c-you">You</h2>
+      <div id="you" class="stack"></div>
+    </section>
+
+    <section id="sec-inbox" aria-labelledby="h-inbox">
+      <h2 id="h-inbox" class="cat-h c-tasks">Needs you <span id="inbox-count" class="count"></span></h2>
+      <div id="inbox" class="stack"></div>
+    </section>
+
+    <div class="board">
+      <section id="sec-working" class="b-working" aria-labelledby="h-working">
+        <h2 id="h-working" class="cat-h c-tasks">Working now <span id="working-count" class="count"></span></h2>
+        <div id="working" class="stack"></div>
+      </section>
+
+      <section id="sec-activity" class="b-activity" aria-labelledby="h-activity">
+        <h2 id="h-activity" class="cat-h c-tasks">Recent activity</h2>
+        <div id="activity" class="stack tight"></div>
+      </section>
+
+      <section id="sec-results" class="b-results" aria-labelledby="h-results">
+        <h2 id="h-results" class="cat-h c-tasks">Recent results <span class="muted small">last 24 h</span></h2>
+        <div id="results" class="stack tight"></div>
+      </section>
+    </div>
+
+    <section id="sec-projects" aria-labelledby="h-projects" hidden>
+      <h2 id="h-projects">Projects <span id="projects-count" class="count"></span></h2>
+      <p id="projects-legend" class="legend" hidden>Asleep / paused agents wake automatically on the next message.</p>
+      <div id="projects" class="stack tight"></div>
+    </section>
+
+    <section id="sec-discussions" aria-labelledby="h-discussions" hidden>
+      <h2 id="h-discussions">Threads</h2>
+      <div id="discussions" class="stack"></div>
+    </section>
+
+    <section id="sec-usage" aria-labelledby="h-usage">
+      <div class="u-top">
+        <h2 id="h-usage" class="cat-h c-usage">Usage &amp; estimated cost <span id="usage-brief" class="muted small"></span></h2>
+        <div id="usage-switch" class="seg" role="group" aria-label="Period">
+          <button type="button" data-group="month" aria-pressed="true">Month</button>
+          <button type="button" data-group="day" aria-pressed="false">Day</button>
+        </div>
+      </div>
+      <div id="usage" class="stack"><div class="empty">Usage loads when you scroll here.</div></div>
+    </section>
+
+    <section id="sec-hosts" aria-labelledby="h-hosts">
+      <details id="fold-hosts" class="fold">
+        <summary><span class="chev" aria-hidden="true"></span><h2 id="h-hosts">Hosts &amp; clients</h2><span id="hosts-brief" class="muted small"></span></summary>
+        <div id="hosts" class="stack"></div>
+        <div id="push-box" class="card push-box" hidden>
+          <div class="sub">Notifications are enabled on this device.</div>
+          <div class="row"><button id="btn-test" type="button">Send test push</button><span id="test-status" class="muted small" role="status"></span></div>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <footer class="foot muted">Read-only view. The reporting agents and hosts stay the source of truth.<span id="build-line" class="build-line"></span></footer>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

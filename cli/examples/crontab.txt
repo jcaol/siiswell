@@ -1,0 +1,3 @@
+# crontab -e : collect and upload token usage every 15 minutes (cron has a minimal PATH: use absolute paths).
+# Settings come from ~/.config/siiswell/config.json (chmod 600); never put a token in the crontab.
+*/15 * * * * /usr/bin/env node $HOME/.local/lib/siiswell/siiswell.mjs usage push >> $HOME/.local/state/siiswell/cron.log 2>&1

@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 830" width="1000" height="830" role="img" aria-labelledby="t d">
+  <title id="t">How siiswell works</title>
+  <desc id="d">Agents, scripts, orchestrators and the usage collector on your machines report to your self-hosted siiswell server across a privacy line that only counts, times and short scrubbed titles cross. The server evaluates fixed rules every minute and reaches you through the dashboard and Web Push.</desc>
+  <defs>
+    <marker id="ab" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#0969da"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#1a7f37"/></marker>
+    <marker id="ap" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8250df"/></marker>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1f2328; }
+      .h { font-size: 15px; font-weight: 700; letter-spacing: 0.08em; fill: #59636e; }
+      .b { font-size: 22px; font-weight: 700; }
+      .s { font-size: 16px; fill: #59636e; }
+      .l { font-size: 16px; font-weight: 600; }
+      .c { text-anchor: middle; }
+    </style>
+  </defs>
+
+  <rect x="1" y="1" width="998" height="828" rx="20" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+
+  <!-- your machines -->
+  <rect x="30" y="30" width="940" height="240" rx="16" fill="#f6f8fa" stroke="#d0d7de"/>
+  <text class="h" x="60" y="62">ON YOUR MACHINES</text>
+
+  <rect x="60" y="80" width="280" height="78" rx="12" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text class="b c" x="200" y="113">CLI agents</text>
+  <text class="s c" x="200" y="140">Claude Code · Codex · Gemini</text>
+
+  <rect x="360" y="80" width="280" height="78" rx="12" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text class="b c" x="500" y="113">Desktop &amp; IDE</text>
+  <text class="s c" x="500" y="140">Claude Desktop · Codex IDE</text>
+
+  <rect x="660" y="80" width="280" height="78" rx="12" fill="#ddf4ff" stroke="#0969da" stroke-width="1.5"/>
+  <text class="b c" x="800" y="113">Scripts, CI &amp; API</text>
+  <text class="s c" x="800" y="140">siiswell CLI · curl</text>
+
+  <rect x="60" y="172" width="430" height="78" rx="12" fill="#dafbe1" stroke="#1a7f37" stroke-width="1.5"/>
+  <text class="b c" x="275" y="205">Agent orchestrators</text>
+  <text class="s c" x="275" y="232">host integration · .siiswell-agents marker</text>
+
+  <rect x="510" y="172" width="430" height="78" rx="12" fill="#dafbe1" stroke="#1a7f37" stroke-width="1.5"/>
+  <text class="b c" x="725" y="205">Usage collector</text>
+  <text class="s c" x="725" y="232">token counts from local logs, hourly</text>
+
+  <!-- the privacy line -->
+  <line x1="30" y1="312" x2="970" y2="312" stroke="#9a6700" stroke-width="2" stroke-dasharray="8 7"/>
+  <rect x="235" y="297" width="530" height="30" rx="15" fill="#fff8c5" stroke="#9a6700"/>
+  <text class="l c" x="500" y="318" style="fill:#7d4e00">Privacy line: counts, times and short scrubbed titles only</text>
+
+
+  <!-- the server -->
+  <rect x="30" y="378" width="940" height="232" rx="16" fill="#f6f8fa" stroke="#d0d7de"/>
+  <text class="h c" x="500" y="406">YOUR SIISWELL SERVER · Cloudflare or Docker</text>
+
+  <rect x="60" y="420" width="430" height="80" rx="12" fill="#ffffff" stroke="#0969da" stroke-width="1.5"/>
+  <text class="b c" x="275" y="454">/mcp</text>
+  <text class="s c" x="275" y="481">report_task · update_task · heartbeat</text>
+
+  <rect x="510" y="420" width="430" height="80" rx="12" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5"/>
+  <text class="b c" x="725" y="454">/api/ingest</text>
+  <text class="s c" x="725" y="481">usage totals · host state · OpenTelemetry</text>
+
+  <rect x="60" y="514" width="880" height="80" rx="12" fill="#ffffff" stroke="#59636e" stroke-width="1.5"/>
+  <text class="b c" x="500" y="548">Rules &amp; push policy</text>
+  <text class="s c" x="500" y="575">every minute · fixed thresholds · no AI calls · 30-day retention</text>
+
+  <!-- arrows into the server (drawn over its frame) -->
+  <line x1="200" y1="270" x2="200" y2="414" stroke="#0969da" stroke-width="3" marker-end="url(#ab)"/>
+  <text class="l" x="214" y="362" style="fill:#0969da">MCP · client token</text>
+  <line x1="800" y1="270" x2="800" y2="414" stroke="#1a7f37" stroke-width="3" marker-end="url(#ag)"/>
+  <text class="l" x="786" y="362" text-anchor="end" style="fill:#1a7f37">host token</text>
+
+  <!-- to you -->
+  <line x1="500" y1="610" x2="500" y2="662" stroke="#8250df" stroke-width="3" marker-end="url(#ap)"/>
+
+  <rect x="30" y="664" width="940" height="140" rx="16" fill="#f6f8fa" stroke="#d0d7de"/>
+  <text class="h" x="60" y="694">YOU</text>
+
+  <rect x="60" y="708" width="430" height="80" rx="12" fill="#fbefff" stroke="#8250df" stroke-width="1.5"/>
+  <text class="b c" x="275" y="742">Dashboard</text>
+  <text class="s c" x="275" y="769">browser · phone app (PWA) · dark mode</text>
+
+  <rect x="510" y="708" width="430" height="80" rx="12" fill="#fbefff" stroke="#8250df" stroke-width="1.5"/>
+  <text class="b c" x="725" y="742">Web Push</text>
+  <text class="s c" x="725" y="769">urgent now · the rest in a summary · quiet hours</text>
+</svg>

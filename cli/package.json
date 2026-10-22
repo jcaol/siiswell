@@ -1,0 +1,47 @@
+{
+  "name": "siiswell",
+  "license": "Apache-2.0",
+  "version": "0.6.0",
+  "description": "siiswell client: report long-running agent work, relay MCP over stdio, collect and upload token usage",
+  "type": "module",
+  "bin": {
+    "siiswell": "dist/siiswell.mjs"
+  },
+  "files": [
+    "dist/siiswell.mjs",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "bun build.ts"
+  },
+  "keywords": [
+    "ai-agents",
+    "claude-code",
+    "codex",
+    "mcp",
+    "mcp-server",
+    "llm",
+    "llm-usage",
+    "token-usage",
+    "ai-cost",
+    "developer-tools",
+    "self-hosted",
+    "dashboard",
+    "well-being",
+    "notifications"
+  ],
+  "homepage": "https://siiswell.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jcaol/siiswell.git",
+    "directory": "cli"
+  },
+  "bugs": {
+    "url": "https://github.com/jcaol/siiswell/issues"
+  },
+  "author": "siiswell.com <hello@siiswell.com> (https://siiswell.com)"
+}

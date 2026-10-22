@@ -1,0 +1,65 @@
+# Example: siiswell behind your own TLS reverse proxy. Copy, then fill .env (never commit it).
+# docs/deploy.md "Deploy with Docker" explains every setting.
+#
+# AUTH_MODE=builtin (default): the dashboard does its own login. The port is published on 127.0.0.1 only and a TLS
+#   proxy on the host forwards to it. You MUST then set TRUSTED_PROXY_CIDRS=<the address the proxy connects from>/32
+#   (with a host proxy and this published port: the siiswell-internal gateway, 172.28.0.1/32): without it every client
+#   shares the proxy's address for the login limits, so logins carrying X-Forwarded-For are refused.
+#   (Trusting the gateway is acceptable ONLY here: builtin mode uses X-Forwarded-For just for the login limits, and the
+#   port is reachable from this host only. Never do it in proxy mode, where the header names the user.)
+# AUTH_MODE=proxy: the reverse proxy signs users in and sends the identity header. Then:
+#   - do NOT publish the dashboard's port (delete `ports:` below): reach it only through the proxy;
+#   - run the proxy on the internal network below with the FIXED address 172.28.0.10, and trust exactly that:
+#     TRUSTED_PROXY_CIDRS=172.28.0.10/32.
+#   WARNING: never trust a Docker range such as 172.16.0.0/12 or the bridge gateway. Traffic to a published port
+#   arrives from the gateway address, so trusting it lets anyone who can reach that port name any identity. The
+#   server refuses CIDRs wider than /24 (IPv4) or /64 (IPv6) in proxy mode unless ALLOW_WIDE_PROXY_CIDR=1.
+services:
+  siiswell:
+    build: .
+    image: siiswell:local
+    restart: unless-stopped
+    stop_grace_period: 30s
+    # builtin mode only (remove in proxy mode):
+    ports:
+      - "127.0.0.1:8787:8787"
+    networks:
+      - siiswell-internal
+    volumes:
+      - siiswell-data:/data
+    env_file: .env
+    environment:
+      # The origin users open, exactly (scheme + host, no path).
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
+      AUTH_MODE: ${AUTH_MODE:-builtin}
+      # Set in .env. Single-quote the argon2id hash there (or write every "$" as "$$"): compose interpolates "$".
+      # ADMIN_PASSWORD_HASH: ...
+      # AUTH_MODE=proxy instead (see the header comment):
+      # TRUSTED_PROXY_CIDRS: 172.28.0.10/32
+      # AUTH_PROXY_HEADER: X-Forwarded-Email
+      # ALLOWED_EMAILS: you@example.com
+      # Optional phone pushes (bun scripts/vapid.ts): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
+      # Optional: RETENTION_DAYS (30), USAGE_RETENTION_DAYS (800), TICKER_ENABLED (1)
+
+  # proxy mode: your authenticating proxy (oauth2-proxy, Caddy + forward_auth, ...), on both networks, with the fixed
+  # internal address the dashboard trusts. Only the proxy publishes a port.
+  # auth-proxy:
+  #   image: <your proxy image, pinned>
+  #   ports:
+  #     - "443:443"
+  #   networks:
+  #     edge: {}
+  #     siiswell-internal:
+  #       ipv4_address: 172.28.0.10
+
+networks:
+  # internal: true has no route out, so the dashboard could not send phone pushes; keep it a normal bridge with a
+  # fixed subnet, and in proxy mode publish no dashboard port.
+  siiswell-internal:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+  edge: {}
+
+volumes:
+  siiswell-data:
